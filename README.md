@@ -1,6 +1,6 @@
 # Notification Service
 
-A **production-quality** multi-channel notification backend built with Kotlin, Spring Boot 3, and PostgreSQL.
+A multi-channel notification backend built with Kotlin, Spring Boot 3, RabbitMQ, and PostgreSQL, featuring asynchronous processing, retry mechanisms, scheduling, and user notification preferences.
 
 ## Tech Stack
 
