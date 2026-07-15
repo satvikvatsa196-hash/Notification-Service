@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # PostgreSQL
+  # ─────────────────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: notification-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-notification_db}
+      POSTGRES_USER: ${POSTGRES_USER:-notif_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-notif_pass}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-notif_user} -d ${POSTGRES_DB:-notification_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - notification-net
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Notification Service Application
+  # ─────────────────────────────────────────────────────────────────────────────
+  notification-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notification-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-notification_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-notif_user}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-notif_pass}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    networks:
+      - notification-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  notification-net:
+    driver: bridge

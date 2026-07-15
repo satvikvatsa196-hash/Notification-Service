@@ -1,0 +1,22 @@
+.gradle/
+build/
+out/
+*.class
+
+# Environment
+.env
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
