@@ -109,18 +109,22 @@ class AuthSecurityIT {
             }
         }
 
-        @Test
-        fun `successful ADMIN registration returns 201 with role ADMIN`() {
-            val req = RegisterRequest("new-admin@test.com", "strongPass1", Role.ADMIN)
+       @Test
+fun `registration with ADMIN role request still creates USER`() {
+    val req = RegisterRequest(
+        "fake-admin@test.com",
+        "strongPass1",
+        Role.ADMIN
+    )
 
-            mockMvc.post("/api/v1/auth/register") {
-                contentType = MediaType.APPLICATION_JSON
-                content = json(req)
-            }.andExpect {
-                status { isCreated() }
-                jsonPath("$.data.role") { value("ADMIN") }
-            }
-        }
+    mockMvc.post("/api/v1/auth/register") {
+        contentType = MediaType.APPLICATION_JSON
+        content = json(req)
+    }.andExpect {
+        status { isCreated() }
+        jsonPath("$.data.role") { value("USER") }
+    }
+}
 
         @Test
         fun `duplicate email registration returns 409 Conflict`() {
