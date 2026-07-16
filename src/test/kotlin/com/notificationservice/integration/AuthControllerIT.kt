@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.notificationservice.dto.request.LoginRequest
 import com.notificationservice.dto.request.RegisterRequest
 import com.notificationservice.domain.enums.Role
+import com.notificationservice.repository.UserRepository
+import com.notificationservice.security.AuthSecurityIT
+import com.notificationservice.util.JwtUtil
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -11,15 +14,12 @@ import org.junit.jupiter.api.TestMethodOrder
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.http.MediaType
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
-import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
 
 /**
  * Integration tests for authentication endpoints and protected resource access.
@@ -36,20 +36,11 @@ import org.testcontainers.junit.jupiter.Testcontainers
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-@Testcontainers
-@ActiveProfiles("test")
+@ActiveProfiles("h2test")
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class AuthControllerIT {
 
     companion object {
-        @Container
-        @ServiceConnection
-        val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine").apply {
-            withDatabaseName("notification_auth_test_db")
-            withUsername("test_user")
-            withPassword("test_pass")
-        }
-
         // Shared token across tests (populated after registration)
         var userToken: String = ""
         var adminToken: String = ""
@@ -60,6 +51,15 @@ class AuthControllerIT {
 
     @Autowired
     lateinit var objectMapper: ObjectMapper
+
+    @Autowired
+    lateinit var userRepository: UserRepository
+
+    @Autowired
+    lateinit var passwordEncoder: PasswordEncoder
+
+    @Autowired
+    lateinit var jwtUtil: JwtUtil
 
     // ── Registration ─────────────────────────────────────────────────────────
 
@@ -88,23 +88,29 @@ class AuthControllerIT {
 
     @Test
     @Order(2)
-    fun `POST auth register should create an ADMIN and return 201`() {
+    fun `POST auth register with ADMIN role request still creates USER`() {
         val request = RegisterRequest(
-            email = "admin@integtest.com",
+            email = "admin-attempt@integtest.com",
             password = "adminpass123",
             role = Role.ADMIN
         )
 
-        val result = mockMvc.post("/api/v1/auth/register") {
+        mockMvc.post("/api/v1/auth/register") {
             contentType = MediaType.APPLICATION_JSON
             content = objectMapper.writeValueAsString(request)
         }.andExpect {
             status { isCreated() }
-            jsonPath("$.data.role") { value("ADMIN") }
-        }.andReturn()
+            jsonPath("$.data.role") { value("USER") }
+        }
 
-        val body = objectMapper.readTree(result.response.contentAsString)
-        adminToken = body["data"]["token"].asText()
+        // Create ADMIN directly in the test database so adminToken is populated for subsequent tests
+        val admin = com.notificationservice.domain.model.User(
+            email = "admin@integtest.com",
+            passwordHash = passwordEncoder.encode("adminpass123"),
+            role = Role.ADMIN
+        )
+        val savedAdmin = userRepository.save(admin)
+        adminToken = jwtUtil.generateToken(savedAdmin, savedAdmin.role.name)
     }
 
     @Test

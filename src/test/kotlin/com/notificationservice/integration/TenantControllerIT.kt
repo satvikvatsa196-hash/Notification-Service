@@ -4,21 +4,20 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.notificationservice.domain.enums.Role
 import com.notificationservice.dto.request.CreateTenantRequest
 import com.notificationservice.dto.request.RegisterRequest
+import com.notificationservice.repository.UserRepository
+import com.notificationservice.util.JwtUtil
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.http.MediaType
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
-import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
 
 /**
  * Integration test for the Tenant API.
@@ -31,20 +30,9 @@ import org.testcontainers.junit.jupiter.Testcontainers
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-@Testcontainers
-@ActiveProfiles("test")
+@ActiveProfiles("h2test")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class TenantControllerIT {
-
-    companion object {
-        @Container
-        @ServiceConnection
-        val postgres = PostgreSQLContainer<Nothing>("postgres:16-alpine").apply {
-            withDatabaseName("notification_test_db")
-            withUsername("test_user")
-            withPassword("test_pass")
-        }
-    }
 
     @Autowired
     lateinit var mockMvc: MockMvc
@@ -52,24 +40,30 @@ class TenantControllerIT {
     @Autowired
     lateinit var objectMapper: ObjectMapper
 
+    @Autowired
+    lateinit var userRepository: UserRepository
+
+    @Autowired
+    lateinit var passwordEncoder: PasswordEncoder
+
+    @Autowired
+    lateinit var jwtUtil: JwtUtil
+
     private var adminToken: String = ""
 
     @BeforeAll
     fun setUpAuth() {
-        // Register an ADMIN user once for all tenant tests
-        val request = RegisterRequest(
+        // Wipe all users first
+        userRepository.deleteAll()
+
+        // Create an ADMIN directly in the test database
+        val admin = com.notificationservice.domain.model.User(
             email = "tenant-test-admin@example.com",
-            password = "adminpass123",
+            passwordHash = passwordEncoder.encode("adminpass123"),
             role = Role.ADMIN
         )
-
-        val result = mockMvc.post("/api/v1/auth/register") {
-            contentType = MediaType.APPLICATION_JSON
-            content = objectMapper.writeValueAsString(request)
-        }.andReturn()
-
-        val body = objectMapper.readTree(result.response.contentAsString)
-        adminToken = body["data"]["token"].asText()
+        val savedAdmin = userRepository.save(admin)
+        adminToken = jwtUtil.generateToken(savedAdmin, savedAdmin.role.name)
     }
 
     @Test

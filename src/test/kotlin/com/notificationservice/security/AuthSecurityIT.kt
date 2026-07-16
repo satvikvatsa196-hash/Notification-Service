@@ -65,8 +65,14 @@ class AuthSecurityIT {
         // Register USER
         userToken = registerAndGetToken(userEmail, userPassword, Role.USER)
 
-        // Register ADMIN
-        adminToken = registerAndGetToken(adminEmail, adminPassword, Role.ADMIN)
+        // Create ADMIN directly in the test database
+        val admin = com.notificationservice.domain.model.User(
+            email = adminEmail,
+            passwordHash = passwordEncoder.encode(adminPassword),
+            role = Role.ADMIN
+        )
+        val savedAdmin = userRepository.save(admin)
+        adminToken = jwtUtil.generateToken(savedAdmin, savedAdmin.role.name)
     }
 
     // ── Helper ────────────────────────────────────────────────────────────────
@@ -109,7 +115,7 @@ class AuthSecurityIT {
             }
         }
 
-       @Test
+        @Test
 fun `registration with ADMIN role request still creates USER`() {
     val req = RegisterRequest(
         "fake-admin@test.com",
