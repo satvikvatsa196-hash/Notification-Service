@@ -83,6 +83,9 @@ class JwtUtil(
         } catch (ex: JwtException) {
             log.debug("JWT validation failed: {}", ex.message)
             false
+        } catch (ex: IllegalArgumentException) {
+            log.debug("JWT validation failed (illegal argument): {}", ex.message)
+            false
         }
     }
 
@@ -96,6 +99,9 @@ class JwtUtil(
             true
         } catch (ex: JwtException) {
             log.debug("Token is invalid or expired: {}", ex.message)
+            false
+        } catch (ex: IllegalArgumentException) {
+            log.debug("Token is blank or malformed (illegal argument): {}", ex.message)
             false
         }
     }

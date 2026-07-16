@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# h2test profile — used for AuthSecurityIT and other H2-backed security tests.
+# No Docker or external database required.
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring:
+  datasource:
+    # H2 in PostgreSQL compatibility mode so Hibernate/JPA types behave as expected.
+    # DB_CLOSE_DELAY=-1 keeps the database alive for the full test run.
+    url: "jdbc:h2:mem:notification_security_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  # Let Hibernate own the schema for H2 — Flyway migrations use PostgreSQL-specific
+  # SQL (uuid_generate_v4, JSONB, ON CONFLICT) that H2 does not support.
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: false
+    show-sql: false
+
+  # Disable Flyway — schema is managed by Hibernate DDL above.
+  flyway:
+    enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.notificationservice: DEBUG
+    org.springframework.security: DEBUG
+
+app:
+  jwt:
+    secret: "h2-test-jwt-secret-exactly-32chars-long!"
+    expiration-ms: 3600000   # 1 hour — long enough for any test

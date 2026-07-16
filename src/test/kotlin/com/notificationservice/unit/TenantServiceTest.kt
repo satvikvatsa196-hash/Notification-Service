@@ -42,7 +42,7 @@ class TenantServiceTest {
         every { tenantRepository.existsByName(request.name) } returns false
         every { tenantRepository.existsBySlug(request.slug) } returns false
         every { tenantRepository.save(any()) } answers {
-            firstArg<Tenant>().apply { }
+            firstArg<Tenant>().apply { id = UUID.randomUUID() }
         }
 
         val result = tenantService.createTenant(request)
