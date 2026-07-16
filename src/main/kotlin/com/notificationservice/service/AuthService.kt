@@ -60,7 +60,7 @@ class AuthService(
         val user = User(
             email = request.email,
             passwordHash = passwordEncoder.encode(request.password),
-            role = request.role
+            role = Role.USER
         )
 
         val saved = userRepository.save(user)
