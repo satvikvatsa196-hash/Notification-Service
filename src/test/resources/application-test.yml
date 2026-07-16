@@ -12,3 +12,8 @@ logging:
     root: WARN
     com.notificationservice: INFO
     org.flywaydb: INFO
+
+app:
+  jwt:
+    secret: "test-jwt-secret-for-integration-tests-only-32chars"
+    expiration-ms: 3600000   # 1 hour for tests

@@ -80,3 +80,9 @@ app:
     allowed-origins:
       - "http://localhost:3000"
       - "http://localhost:4200"
+  jwt:
+    # SECURITY: Override this in production with a strong random secret (>=32 chars)
+    # e.g. via environment variable: APP_JWT_SECRET=<your-secret>
+    secret: "${APP_JWT_SECRET:notification-service-jwt-secret-change-in-production}"
+    # Token validity in milliseconds (default: 24 hours)
+    expiration-ms: "${APP_JWT_EXPIRATION_MS:86400000}"

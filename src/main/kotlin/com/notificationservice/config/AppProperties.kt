@@ -9,7 +9,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 @ConfigurationProperties(prefix = "app")
 data class AppProperties(
     val api: ApiProperties = ApiProperties(),
-    val cors: CorsProperties = CorsProperties()
+    val cors: CorsProperties = CorsProperties(),
+    val jwt: JwtProperties = JwtProperties()
 ) {
     data class ApiProperties(
         val version: String = "v1",
@@ -18,5 +19,10 @@ data class AppProperties(
 
     data class CorsProperties(
         val allowedOrigins: List<String> = emptyList()
+    )
+
+    data class JwtProperties(
+        val secret: String = "change-me",
+        val expirationMs: Long = 86_400_000L   // 24 hours
     )
 }

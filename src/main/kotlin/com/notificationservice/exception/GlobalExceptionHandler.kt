@@ -7,6 +7,8 @@ import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.security.authentication.BadCredentialsException
+import org.springframework.security.authentication.DisabledException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -29,6 +31,34 @@ import org.springframework.web.servlet.NoHandlerFoundException
 class GlobalExceptionHandler {
 
     private val log = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
+
+    // ── Authentication / Authorization Exceptions ────────────────────────────
+
+    @ExceptionHandler(BadCredentialsException::class)
+    fun handleBadCredentials(
+        ex: BadCredentialsException,
+        request: HttpServletRequest
+    ): ResponseEntity<ErrorResponse> {
+        log.debug("Bad credentials for request: {}", request.requestURI)
+        return buildResponse(HttpStatus.UNAUTHORIZED, "Unauthorized", "Invalid email or password", request)
+    }
+
+    @ExceptionHandler(DisabledException::class)
+    fun handleDisabledUser(
+        ex: DisabledException,
+        request: HttpServletRequest
+    ): ResponseEntity<ErrorResponse> {
+        return buildResponse(HttpStatus.FORBIDDEN, "Forbidden", "Account is disabled", request)
+    }
+
+    @ExceptionHandler(EmailAlreadyExistsException::class)
+    fun handleEmailAlreadyExists(
+        ex: EmailAlreadyExistsException,
+        request: HttpServletRequest
+    ): ResponseEntity<ErrorResponse> {
+        log.debug("Email conflict: {}", ex.message)
+        return buildResponse(HttpStatus.CONFLICT, "Conflict", ex.message!!, request)
+    }
 
     // ── Domain Exceptions ────────────────────────────────────────────────────
 
