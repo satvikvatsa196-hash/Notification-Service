@@ -10,6 +10,8 @@ import com.notificationservice.repository.ChannelRepository
 import com.notificationservice.repository.NotificationRepository
 import com.notificationservice.repository.TenantRepository
 import com.notificationservice.service.NotificationService
+import com.notificationservice.messaging.producer.NotificationProducer
+import com.notificationservice.dto.event.NotificationEvent
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.BeforeEach
@@ -34,11 +36,14 @@ class NotificationServiceTest {
     @Mock
     private lateinit var channelRepository: ChannelRepository
 
+    @Mock
+    private lateinit var notificationProducer: NotificationProducer
+
     private lateinit var notificationService: NotificationService
 
     @BeforeEach
     fun setUp() {
-        notificationService = NotificationService(notificationRepository, tenantRepository, channelRepository)
+        notificationService = NotificationService(notificationRepository, tenantRepository, channelRepository, notificationProducer)
     }
 
     @Test
@@ -69,7 +74,8 @@ class NotificationServiceTest {
 
         assertNotNull(response)
         assertEquals("user@example.com", response.recipient)
-        assertEquals(NotificationStatus.CREATED, response.status)
+        assertEquals(NotificationStatus.PENDING, response.status)
         verify(notificationRepository, times(1)).save(any(Notification::class.java))
+        verify(notificationProducer, times(1)).sendNotificationEvent(any(NotificationEvent::class.java))
     }
 }

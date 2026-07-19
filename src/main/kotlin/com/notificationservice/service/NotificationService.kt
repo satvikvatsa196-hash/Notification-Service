@@ -15,14 +15,18 @@ import org.springframework.data.jpa.domain.Specification
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import jakarta.persistence.criteria.Predicate
+import java.time.LocalDateTime
 import java.util.UUID
+import com.notificationservice.messaging.producer.NotificationProducer
+import com.notificationservice.dto.event.NotificationEvent
 
 @Service
 @Transactional
 class NotificationService(
     private val notificationRepository: NotificationRepository,
     private val tenantRepository: TenantRepository,
-    private val channelRepository: ChannelRepository
+    private val channelRepository: ChannelRepository,
+    private val notificationProducer: NotificationProducer
 ) {
 
     fun createNotification(tenantId: UUID, request: CreateNotificationRequest): NotificationResponse {
@@ -42,11 +46,19 @@ class NotificationService(
             recipient = request.recipient,
             subject = request.subject,
             content = request.content,
-            status = NotificationStatus.CREATED,
+            status = NotificationStatus.PENDING,
             scheduledAt = request.scheduledAt
         )
 
         val savedNotification = notificationRepository.save(notification)
+        
+        notificationProducer.sendNotificationEvent(
+            NotificationEvent(
+                notificationId = savedNotification.id!!,
+                tenantId = tenantId
+            )
+        )
+
         return mapToResponse(savedNotification)
     }
 
@@ -121,5 +133,30 @@ class NotificationService(
             createdAt = notification.createdAt,
             updatedAt = notification.updatedAt
         )
+    }
+
+    @Transactional
+    fun processNotification(notificationId: UUID) {
+        val notification = notificationRepository.findById(notificationId)
+            .orElseThrow { ResourceNotFoundException("Notification not found with ID: $notificationId") }
+
+        try {
+            // Update status to PROCESSING
+            notification.status = NotificationStatus.PROCESSING
+            notificationRepository.saveAndFlush(notification)
+
+            // Simulate actual sending logic (e.g., calling an external API)
+            // Thread.sleep(500) 
+
+            // Update status to SENT
+            notification.status = NotificationStatus.SENT
+            notification.sentAt = LocalDateTime.now()
+            notificationRepository.save(notification)
+        } catch (e: Exception) {
+            notification.status = NotificationStatus.FAILED
+            notification.errorDetails = e.message ?: "Unknown error occurred during processing"
+            notificationRepository.save(notification)
+            throw e
+        }
     }
 }

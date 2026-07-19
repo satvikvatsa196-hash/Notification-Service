@@ -30,6 +30,9 @@ dependencies {
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
 
+    // ── Messaging ─────────────────────────────────────────────────────────────
+    implementation("org.springframework.boot:spring-boot-starter-amqp")
+
     // ── Database ──────────────────────────────────────────────────────────────
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.flywaydb:flyway-core")
@@ -54,7 +57,9 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:rabbitmq")
     testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("org.awaitility:awaitility:4.2.2")
     testImplementation("org.springframework.security:spring-security-test")
     testRuntimeOnly("com.h2database:h2")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
