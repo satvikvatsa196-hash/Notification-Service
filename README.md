@@ -1,6 +1,6 @@
 # Notification Service
 
-A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and Spring Security. Currently includes JWT authentication, role-based authorization, Flyway migrations, Docker support, and a clean layered architecture. Asynchronous notification processing with RabbitMQ, retries, caching, and scheduling will be added in subsequent milestones.
+A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and Spring Security. Currently includes JWT authentication, role-based authorization, Flyway migrations, Docker support, and a clean layered architecture. Features include Asynchronous notification processing with RabbitMQ, dynamic delivery providers via Strategy Pattern, and comprehensive Notification Management. Retries, caching, and scheduling will be added in subsequent milestones.
 
 ## Tech Stack
 
@@ -10,6 +10,7 @@ A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and
 | Framework | Spring Boot 3.3 |
 | Database | PostgreSQL 16 |
 | Migrations | Flyway |
+| Messaging | RabbitMQ |
 | Security | Spring Security 6 + JWT (JJWT 0.12) + BCrypt |
 | API Docs | SpringDoc OpenAPI 3 (Swagger UI) |
 | Containers | Docker & Docker Compose |
@@ -20,11 +21,11 @@ A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and
 
 ## Quick Start
 
-### 1. Start PostgreSQL via Docker Compose
+### 1. Start PostgreSQL and RabbitMQ via Docker Compose
 
 ```bash
 cp .env.example .env
-docker-compose up postgres -d
+docker-compose up postgres rabbitmq -d
 ```
 
 ### 2. Run the Application (local profile)
@@ -105,6 +106,9 @@ curl http://localhost:8080/api/v1/tenants \
 | `DELETE` | `/api/v1/tenants/{id}` | ADMIN only |
 | `GET` | `/api/v1/tenants/{id}/channels` | USER or ADMIN |
 | `POST` | `/api/v1/tenants/{id}/channels` | USER or ADMIN |
+| `GET` | `/api/v1/tenants/{id}/notifications` | USER or ADMIN |
+| `POST` | `/api/v1/tenants/{id}/notifications` | USER or ADMIN |
+| `GET` | `/api/v1/tenants/{id}/notifications/{notifId}` | USER or ADMIN |
 
 > **Note:** Swagger UI, `/api-docs`, and `/actuator/health` are public.
 
@@ -159,6 +163,14 @@ docker-compose up --build
 | `GET` | `/api/v1/tenants/{tenantId}/channels/{id}` | Get channel by ID | USER |
 | `POST` | `/api/v1/tenants/{tenantId}/channels` | Create a channel | USER |
 
+### Notifications
+
+| Method | Endpoint | Description | Role |
+|---|---|---|---|
+| `GET` | `/api/v1/tenants/{tenantId}/notifications` | List notification history (paginated) | USER |
+| `GET` | `/api/v1/tenants/{tenantId}/notifications/{id}` | Get notification by ID | USER |
+| `POST` | `/api/v1/tenants/{tenantId}/notifications` | Create and enqueue a notification | USER |
+
 ---
 
 ## Project Structure
@@ -174,9 +186,11 @@ src/main/kotlin/com/notificationservice/
 │   ├── request/     # Validated request DTOs (RegisterRequest, LoginRequest, ...)
 │   └── response/    # Response DTOs (AuthResponse, ApiResponse envelope, ...)
 ├── exception/       # Custom exceptions + GlobalExceptionHandler
+├── messaging/       # RabbitMQ producers and consumers
+├── provider/        # Strategy Pattern implementations for channel delivery
 ├── repository/      # Spring Data JPA repositories
 ├── security/        # JwtAuthenticationFilter
-├── service/         # Business logic (AuthService, UserDetailsServiceImpl, ...)
+├── service/         # Business logic (AuthService, NotificationService, ...)
 └── util/            # JwtUtil + entity-to-DTO mapping
 
 src/main/resources/db/migration/

@@ -19,6 +19,7 @@ import java.time.LocalDateTime
 import java.util.UUID
 import com.notificationservice.messaging.producer.NotificationProducer
 import com.notificationservice.dto.event.NotificationEvent
+import com.notificationservice.provider.NotificationSender
 
 @Service
 @Transactional
@@ -26,7 +27,8 @@ class NotificationService(
     private val notificationRepository: NotificationRepository,
     private val tenantRepository: TenantRepository,
     private val channelRepository: ChannelRepository,
-    private val notificationProducer: NotificationProducer
+    private val notificationProducer: NotificationProducer,
+    private val notificationSenders: List<NotificationSender>
 ) {
 
     fun createNotification(tenantId: UUID, request: CreateNotificationRequest): NotificationResponse {
@@ -145,8 +147,12 @@ class NotificationService(
             notification.status = NotificationStatus.PROCESSING
             notificationRepository.saveAndFlush(notification)
 
-            // Simulate actual sending logic (e.g., calling an external API)
-            // Thread.sleep(500) 
+            // Find the appropriate notification sender using the Strategy Pattern
+            val sender = notificationSenders.find { it.supports(notification.channel.channelType) }
+                ?: throw IllegalArgumentException("No notification provider found for channel type: ${notification.channel.channelType}")
+
+            // Execute the send logic dynamically based on the provider
+            sender.send(notification)
 
             // Update status to SENT
             notification.status = NotificationStatus.SENT
