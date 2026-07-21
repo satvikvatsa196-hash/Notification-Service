@@ -1,6 +1,6 @@
 # Notification Service
 
-A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and Spring Security. Currently includes JWT authentication, role-based authorization, Flyway migrations, Docker support, and a clean layered architecture. Features include Asynchronous notification processing with RabbitMQ, dynamic delivery providers via Strategy Pattern, and comprehensive Notification Management. Retries, caching, and scheduling will be added in subsequent milestones.
+A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and Spring Security. Currently includes JWT authentication, role-based authorization, Flyway migrations, Docker support, and a clean layered architecture. Features include Asynchronous notification processing with RabbitMQ, dynamic delivery providers via Strategy Pattern, comprehensive Notification Management, and robust failure handling (including automatic retries with exponential backoff and a Dead Letter Queue). Caching and scheduling will be added in subsequent milestones.
 
 ## Tech Stack
 
@@ -16,6 +16,16 @@ A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and
 | Containers | Docker & Docker Compose |
 | Testing | JUnit 5 + MockK + Testcontainers |
 | Logging | Logback + Logstash JSON encoder |
+
+---
+
+## Reliability & Failure Handling
+
+To ensure maximum deliverability and stability when integrating with external channel providers, the service leverages RabbitMQ and specific error handling strategies:
+
+- **Transient vs Permanent Failures**: Differentiates between temporary glitches (e.g., rate limits, network timeouts) via `TransientDeliveryException` and unrecoverable errors (e.g., malformed recipients) via `PermanentDeliveryException`.
+- **Automatic Retries with Exponential Backoff**: Transient failures are automatically retried up to 3 times, with an exponentially increasing delay between attempts to avoid overwhelming downstream services.
+- **Dead Letter Queue (DLQ)**: If a notification fails permanently or exhausts its maximum retry limit, it is automatically routed to a `notification.dlq` queue for later manual inspection and replay without blocking healthy traffic.
 
 ---
 
@@ -196,7 +206,8 @@ src/main/kotlin/com/notificationservice/
 src/main/resources/db/migration/
 ├── V1__init_schema.sql       # Tenants, Channels, Templates tables
 ├── V2__seed_channels.sql     # Default channel seed data
-└── V3__add_users_table.sql   # Users table (BCrypt password hash, role)
+├── V3__add_users_table.sql   # Users table (BCrypt password hash, role)
+└── V4__add_retry_count_to_notifications.sql # Retry tracking column
 ```
 
 ---

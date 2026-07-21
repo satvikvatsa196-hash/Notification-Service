@@ -59,6 +59,9 @@ class NotificationMessagingIT {
     lateinit var mockMvc: MockMvc
 
     @Autowired
+    lateinit var rabbitTemplate: org.springframework.amqp.rabbit.core.RabbitTemplate
+
+    @Autowired
     lateinit var objectMapper: ObjectMapper
 
     @Autowired
@@ -133,5 +136,87 @@ class NotificationMessagingIT {
             val notification = notificationRepository.findById(java.util.UUID.fromString(notificationId)).orElseThrow()
             assertEquals(NotificationStatus.SENT, notification.status)
         }
+    }
+
+    @Test
+    fun `should retry successfully on transient failure`() {
+        val request = CreateNotificationRequest(
+            channelId = testChannel.id!!,
+            recipient = "retry-success@example.com",
+            subject = "Retry success test",
+            content = "This should fail once then succeed"
+        )
+
+        val result = mockMvc.post("/api/v1/tenants/${testTenant.id}/notifications") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(request)
+        }.andReturn()
+
+        val notificationId = objectMapper.readTree(result.response.contentAsString).get("data").get("id").asText()
+
+        await().atMost(Duration.ofSeconds(15)).untilAsserted {
+            val notification = notificationRepository.findById(java.util.UUID.fromString(notificationId)).orElseThrow()
+            assertEquals(NotificationStatus.SENT, notification.status)
+            assertEquals(1, notification.retryCount)
+        }
+    }
+
+    @Test
+    fun `should exhaust retries and move to DLQ on continuous transient failures`() {
+        val request = CreateNotificationRequest(
+            channelId = testChannel.id!!,
+            recipient = "exhaustion@example.com",
+            subject = "Exhaustion test",
+            content = "This should exhaust retries and go to DLQ"
+        )
+
+        val result = mockMvc.post("/api/v1/tenants/${testTenant.id}/notifications") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(request)
+        }.andReturn()
+
+        val notificationId = objectMapper.readTree(result.response.contentAsString).get("data").get("id").asText()
+
+        await().atMost(Duration.ofSeconds(25)).untilAsserted {
+            val notification = notificationRepository.findById(java.util.UUID.fromString(notificationId)).orElseThrow()
+            assertEquals(NotificationStatus.FAILED, notification.status)
+            assertEquals(3, notification.retryCount)
+            assertTrue(notification.errorDetails?.contains("Max retries exceeded") == true)
+        }
+
+        // Verify message moved to DLQ
+        val dlqMessage = rabbitTemplate.receive("notification.dlq", 5000)
+        org.junit.jupiter.api.Assertions.assertNotNull(dlqMessage)
+    }
+
+    @Test
+    fun `should move to DLQ immediately on permanent failure`() {
+        val request = CreateNotificationRequest(
+            channelId = testChannel.id!!,
+            recipient = "permanent@example.com",
+            subject = "Permanent test",
+            content = "This should fail permanently and go to DLQ"
+        )
+
+        val result = mockMvc.post("/api/v1/tenants/${testTenant.id}/notifications") {
+            header("Authorization", "Bearer $adminToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = objectMapper.writeValueAsString(request)
+        }.andReturn()
+
+        val notificationId = objectMapper.readTree(result.response.contentAsString).get("data").get("id").asText()
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted {
+            val notification = notificationRepository.findById(java.util.UUID.fromString(notificationId)).orElseThrow()
+            assertEquals(NotificationStatus.FAILED, notification.status)
+            assertEquals(0, notification.retryCount)
+            assertTrue(notification.errorDetails?.contains("Simulated permanent failure") == true)
+        }
+
+        // Verify message moved to DLQ
+        val dlqMessage = rabbitTemplate.receive("notification.dlq", 5000)
+        org.junit.jupiter.api.Assertions.assertNotNull(dlqMessage)
     }
 }

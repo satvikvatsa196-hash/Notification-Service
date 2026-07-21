@@ -149,7 +149,7 @@ class NotificationService(
 
             // Find the appropriate notification sender using the Strategy Pattern
             val sender = notificationSenders.find { it.supports(notification.channel.channelType) }
-                ?: throw IllegalArgumentException("No notification provider found for channel type: ${notification.channel.channelType}")
+                ?: throw com.notificationservice.exception.PermanentDeliveryException("No notification provider found for channel type: ${notification.channel.channelType}")
 
             // Execute the send logic dynamically based on the provider
             sender.send(notification)
@@ -158,11 +158,26 @@ class NotificationService(
             notification.status = NotificationStatus.SENT
             notification.sentAt = LocalDateTime.now()
             notificationRepository.save(notification)
-        } catch (e: Exception) {
-            notification.status = NotificationStatus.FAILED
-            notification.errorDetails = e.message ?: "Unknown error occurred during processing"
-            notificationRepository.save(notification)
+        } catch (e: com.notificationservice.exception.PermanentDeliveryException) {
             throw e
+        } catch (e: Exception) {
+            throw com.notificationservice.exception.TransientDeliveryException(e.message ?: "Unknown error occurred during processing", e)
         }
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    fun incrementRetryCount(notificationId: UUID): Int {
+        val notification = notificationRepository.findById(notificationId).orElse(null) ?: return 0
+        notification.retryCount += 1
+        notificationRepository.save(notification)
+        return notification.retryCount
+    }
+    
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    fun markAsFailed(notificationId: UUID, errorDetails: String) {
+        val notification = notificationRepository.findById(notificationId).orElse(null) ?: return
+        notification.status = NotificationStatus.FAILED
+        notification.errorDetails = errorDetails
+        notificationRepository.save(notification)
     }
 }
