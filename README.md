@@ -11,18 +11,18 @@ graph TD
     API --> Auth(JWT Filter)
     Auth --> Service(Notification Service)
     
-    Service <-->|Cache Aside| Redis[(Redis Cache)]
-    Service <-->|Write| DB[(PostgreSQL)]
+    Service -->|Cache Aside| Redis[(Redis Cache)]
+    Service -->|Write| DB[(PostgreSQL)]
     
     Service -->|Publish Event| Exchange((RabbitMQ Exchange))
     Exchange --> Queue(Notification Queue)
     
-    Worker(Notification Consumer) <--|Consume| Queue
+    Queue -->|Consume| Worker(Notification Consumer)
     Worker -->|Strategy Pattern| Providers(Email, SMS, Push)
-    Worker <-->|Update Status| DB
+    Worker -->|Update Status| DB
     
-    Providers -- "Permanent Fail" --> DLQ(Dead Letter Queue)
-    Providers -- "Transient Fail" --> Retry(Exponential Backoff)
+    Providers -->|Permanent Fail| DLQ(Dead Letter Queue)
+    Providers -->|Transient Fail| Retry(Exponential Backoff)
 ```
 
 ## 3. Database Design
