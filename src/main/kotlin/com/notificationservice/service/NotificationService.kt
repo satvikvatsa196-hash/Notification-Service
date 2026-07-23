@@ -20,6 +20,9 @@ import java.util.UUID
 import com.notificationservice.messaging.producer.NotificationProducer
 import com.notificationservice.dto.event.NotificationEvent
 import com.notificationservice.provider.NotificationSender
+import org.springframework.data.redis.core.StringRedisTemplate
+import java.time.Duration
+import com.notificationservice.exception.DuplicateResourceException
 
 @Service
 @Transactional
@@ -28,10 +31,20 @@ class NotificationService(
     private val tenantRepository: TenantRepository,
     private val channelRepository: ChannelRepository,
     private val notificationProducer: NotificationProducer,
-    private val notificationSenders: List<NotificationSender>
+    private val notificationSenders: List<NotificationSender>,
+    private val stringRedisTemplate: StringRedisTemplate,
+    private val notificationPreferenceService: NotificationPreferenceService
 ) {
 
-    fun createNotification(tenantId: UUID, request: CreateNotificationRequest): NotificationResponse {
+    fun createNotification(tenantId: UUID, request: CreateNotificationRequest, idempotencyKey: String? = null): NotificationResponse {
+        if (idempotencyKey != null) {
+            val key = "idempotency:$tenantId:$idempotencyKey"
+            val isNew = stringRedisTemplate.opsForValue().setIfAbsent(key, "PROCESSING", Duration.ofHours(24))
+            if (isNew != true) {
+                throw DuplicateResourceException("Notification request with idempotency key '$idempotencyKey' already exists")
+            }
+        }
+
         val tenant = tenantRepository.findById(tenantId)
             .orElseThrow { ResourceNotFoundException("Tenant not found with ID: $tenantId") }
 
@@ -40,6 +53,12 @@ class NotificationService(
 
         if (channel.tenant.id != tenantId) {
             throw ResourceNotFoundException("Channel not found for this tenant")
+        }
+
+        val preferences = notificationPreferenceService.getPreferences(tenantId, request.recipient)
+        val isEnabled = preferences[channel.channelType] ?: true
+        if (!isEnabled) {
+            throw IllegalArgumentException("Notification is disabled for channel type ${channel.channelType} by the recipient")
         }
 
         val notification = Notification(

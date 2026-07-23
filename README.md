@@ -1,6 +1,6 @@
 # Notification Service
 
-A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and Spring Security. Currently includes JWT authentication, role-based authorization, Flyway migrations, Docker support, and a clean layered architecture. Features include Asynchronous notification processing with RabbitMQ, dynamic delivery providers via Strategy Pattern, comprehensive Notification Management, and robust failure handling (including automatic retries with exponential backoff and a Dead Letter Queue). Caching and scheduling will be added in subsequent milestones.
+A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and Spring Security. Currently includes JWT authentication, role-based authorization, Flyway migrations, Docker support, and a clean layered architecture. Features include Asynchronous notification processing with RabbitMQ, dynamic delivery providers via Strategy Pattern, comprehensive Notification Management, robust failure handling (including automatic retries with exponential backoff and a Dead Letter Queue), and Redis-backed caching and idempotency. Scheduling will be added in subsequent milestones.
 
 ## Tech Stack
 
@@ -11,6 +11,7 @@ A Notification Service backend built with Kotlin, Spring Boot 3, PostgreSQL, and
 | Database | PostgreSQL 16 |
 | Migrations | Flyway |
 | Messaging | RabbitMQ |
+| Caching | Redis |
 | Security | Spring Security 6 + JWT (JJWT 0.12) + BCrypt |
 | API Docs | SpringDoc OpenAPI 3 (Swagger UI) |
 | Containers | Docker & Docker Compose |
@@ -26,6 +27,15 @@ To ensure maximum deliverability and stability when integrating with external ch
 - **Transient vs Permanent Failures**: Differentiates between temporary glitches (e.g., rate limits, network timeouts) via `TransientDeliveryException` and unrecoverable errors (e.g., malformed recipients) via `PermanentDeliveryException`.
 - **Automatic Retries with Exponential Backoff**: Transient failures are automatically retried up to 3 times, with an exponentially increasing delay between attempts to avoid overwhelming downstream services.
 - **Dead Letter Queue (DLQ)**: If a notification fails permanently or exhausts its maximum retry limit, it is automatically routed to a `notification.dlq` queue for later manual inspection and replay without blocking healthy traffic.
+
+---
+
+## Performance & Idempotency
+
+The service integrates **Redis** to enhance performance and ensure data consistency:
+
+- **Notification Preference Caching (Cache-Aside)**: Notification preferences are frequently read but rarely updated. The service implements the cache-aside pattern using Spring Cache (`@Cacheable`, `@CacheEvict`). Lookups hit Redis first; if absent, they fall back to PostgreSQL and populate the cache. Updates automatically evict the stale cache entry, supplemented by a 1-hour TTL safety net.
+- **Idempotency Handling**: In distributed systems, network blips can cause clients to retry the same notification request. By passing an `Idempotency-Key` header during notification creation, the service uses Redis atomic operations (`setIfAbsent`) to guarantee that the notification is processed exactly once within a 24-hour window, preventing duplicate messages and spam.
 
 ---
 

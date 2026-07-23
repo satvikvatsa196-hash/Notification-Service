@@ -28,9 +28,10 @@ class NotificationController(
     @Operation(summary = "Create a notification")
     fun createNotification(
         @Parameter(description = "Tenant UUID", required = true) @PathVariable tenantId: UUID,
+        @RequestHeader(value = "Idempotency-Key", required = false) idempotencyKey: String?,
         @Valid @RequestBody request: CreateNotificationRequest
     ): ResponseEntity<ApiResponse<NotificationResponse>> {
-        val notification = notificationService.createNotification(tenantId, request)
+        val notification = notificationService.createNotification(tenantId, request, idempotencyKey)
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(notification))
     }
 

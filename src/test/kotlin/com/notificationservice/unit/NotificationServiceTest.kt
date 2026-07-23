@@ -23,6 +23,13 @@ import org.mockito.junit.jupiter.MockitoExtension
 import java.time.Instant
 import java.util.Optional
 import java.util.UUID
+import com.notificationservice.provider.NotificationSender
+import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.ValueOperations
+import com.notificationservice.service.NotificationPreferenceService
+import org.junit.jupiter.api.assertThrows
+import com.notificationservice.exception.DuplicateResourceException
+import org.mockito.ArgumentMatchers.anyString
 
 @ExtendWith(MockitoExtension::class)
 class NotificationServiceTest {
@@ -39,11 +46,28 @@ class NotificationServiceTest {
     @Mock
     private lateinit var notificationProducer: NotificationProducer
 
+    @Mock
+    private lateinit var notificationSenders: List<NotificationSender>
+
+    @Mock
+    private lateinit var stringRedisTemplate: StringRedisTemplate
+
+    @Mock
+    private lateinit var notificationPreferenceService: NotificationPreferenceService
+
     private lateinit var notificationService: NotificationService
 
     @BeforeEach
     fun setUp() {
-        notificationService = NotificationService(notificationRepository, tenantRepository, channelRepository, notificationProducer)
+        notificationService = NotificationService(
+            notificationRepository, 
+            tenantRepository, 
+            channelRepository, 
+            notificationProducer, 
+            notificationSenders, 
+            stringRedisTemplate, 
+            notificationPreferenceService
+        )
     }
 
     @Test
@@ -70,6 +94,8 @@ class NotificationServiceTest {
             notif
         }
 
+        `when`(notificationPreferenceService.getPreferences(tenantId, request.recipient)).thenReturn(mapOf())
+
         val response = notificationService.createNotification(tenantId, request)
 
         assertNotNull(response)
@@ -77,5 +103,25 @@ class NotificationServiceTest {
         assertEquals(NotificationStatus.PENDING, response.status)
         verify(notificationRepository, times(1)).save(any(Notification::class.java))
         verify(notificationProducer, times(1)).sendNotificationEvent(any(NotificationEvent::class.java))
+    }
+
+    @Test
+    fun `createNotification should throw DuplicateResourceException on duplicate idempotency key`() {
+        val tenantId = UUID.randomUUID()
+        val idempotencyKey = "key123"
+        val request = CreateNotificationRequest(
+            channelId = UUID.randomUUID(),
+            recipient = "user@example.com",
+            subject = "Test",
+            content = "Hello World"
+        )
+        
+        val valueOperations = mock(ValueOperations::class.java) as ValueOperations<String, String>
+        `when`(stringRedisTemplate.opsForValue()).thenReturn(valueOperations)
+        `when`(valueOperations.setIfAbsent(anyString(), anyString(), any())).thenReturn(false)
+        
+        assertThrows<DuplicateResourceException> {
+            notificationService.createNotification(tenantId, request, idempotencyKey)
+        }
     }
 }

@@ -44,6 +44,10 @@ dependencies {
     // ── Logging ───────────────────────────────────────────────────────────────
     implementation("net.logstash.logback:logstash-logback-encoder:7.4")
 
+    // ── Redis ─────────────────────────────────────────────────────────────────
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+
+
     // ── Security ──────────────────────────────────────────────────────────────
     implementation("org.springframework.boot:spring-boot-starter-security")
 
@@ -58,6 +62,7 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
     testImplementation("org.testcontainers:rabbitmq")
+    testImplementation("com.redis.testcontainers:testcontainers-redis:2.2.2")
     testImplementation("io.mockk:mockk:1.13.12")
     testImplementation("org.awaitility:awaitility:4.2.2")
     testImplementation("org.springframework.security:spring-security-test")
