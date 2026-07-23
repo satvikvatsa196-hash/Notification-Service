@@ -41,7 +41,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, info, metrics, flyway
+        include: health, info, metrics, flyway, prometheus
       base-path: /actuator
   endpoint:
     health:

@@ -47,6 +47,9 @@ dependencies {
     // ── Redis ─────────────────────────────────────────────────────────────────
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
 
+    // ── Monitoring ────────────────────────────────────────────────────────────
+    implementation("io.micrometer:micrometer-registry-prometheus")
+
 
     // ── Security ──────────────────────────────────────────────────────────────
     implementation("org.springframework.boot:spring-boot-starter-security")
